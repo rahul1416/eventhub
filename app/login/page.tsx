@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -33,6 +33,9 @@ import {
   signInWithEmailAndPassword,
   signInWithPopup,
   GoogleAuthProvider,
+  sendSignInLinkToEmail,
+  isSignInWithEmailLink,
+  signInWithEmailLink,
 } from "firebase/auth";
 
 const formSchema = z.object({
@@ -47,6 +50,7 @@ const formSchema = z.object({
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
+  const [emailLinkSent, setEmailLinkSent] = useState(false);
   const router = useRouter();
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -87,6 +91,72 @@ export default function LoginPage() {
       });
     }
   }
+
+  // Email Link sign-in logic
+  async function handleEmailLinkSignIn() {
+    const email = form.getValues("email");
+    if (!email) {
+      form.setError("email", {
+        type: "manual",
+        message: "Please enter your email to receive a sign-in link.",
+      });
+      return;
+    }
+    try {
+      await sendSignInLinkToEmail(auth, email, {
+        url: "http://localhost:3000/login", // Use localhost for now
+        handleCodeInApp: true,
+      });
+      window.localStorage.setItem("emailForSignIn", email);
+      setEmailLinkSent(true);
+    } catch (error: any) {
+      form.setError("email", {
+        type: "manual",
+        message: error.message,
+      });
+    }
+  }
+
+  // Handle sign-in with email link if present in URL
+  useEffect(() => {
+    if (
+      typeof window !== "undefined" &&
+      isSignInWithEmailLink(auth, window.location.href)
+    ) {
+      let email = window.localStorage.getItem("emailForSignIn") || "";
+      if (!email) {
+        // Prompt user for email if not available
+        email =
+          window.prompt("Please provide your email for confirmation") || "";
+      }
+      if (email) {
+        signInWithEmailLink(auth, email, window.location.href)
+          .then(async (result) => {
+            window.localStorage.removeItem("emailForSignIn");
+            // Fetch account type from MongoDB
+            try {
+              const response = await fetch(`/api/users/${result.user.uid}`);
+              const userData = await response.json();
+              if (userData && userData.accountType === "personal") {
+                router.push("/dashboard/personal");
+              } else if (userData && userData.accountType === "organization") {
+                router.push("/dashboard");
+              } else {
+                router.push("/signup");
+              }
+            } catch (error) {
+              router.push("/dashboard");
+            }
+          })
+          .catch((error) => {
+            form.setError("email", {
+              type: "manual",
+              message: error.message,
+            });
+          });
+      }
+    }
+  }, [router, form, auth]);
 
   function onSubmit(values: z.infer<typeof formSchema>) {
     signInWithEmailAndPassword(auth, values.email, values.password)
@@ -139,6 +209,17 @@ export default function LoginPage() {
                 >
                   <Mail className="mr-2 h-4 w-4" />
                   Sign in with Google
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={handleEmailLinkSignIn}
+                  disabled={emailLinkSent}
+                >
+                  <Mail className="mr-2 h-4 w-4" />
+                  {emailLinkSent
+                    ? "Email Link Sent"
+                    : "Sign in with Email Link"}
                 </Button>
               </div>
 
