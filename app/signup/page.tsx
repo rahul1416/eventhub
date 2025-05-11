@@ -43,6 +43,9 @@ import {
   createUserWithEmailAndPassword,
   signInWithPopup,
   GoogleAuthProvider,
+  sendSignInLinkToEmail,
+  isSignInWithEmailLink,
+  signInWithEmailLink,
 } from "firebase/auth";
 
 const accountFormSchema = z.object({
@@ -90,6 +93,7 @@ export default function SignupPage() {
   const [step, setStep] = useState(1);
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({});
+  const [emailLinkSent, setEmailLinkSent] = useState(false);
   const router = useRouter();
 
   const accountForm = useForm<z.infer<typeof accountFormSchema>>({
@@ -193,6 +197,61 @@ export default function SignupPage() {
     }
   }
 
+  // Email Link sign-up logic
+  async function handleEmailLinkSignup() {
+    const email = accountForm.getValues("email");
+    if (!email) {
+      accountForm.setError("email", {
+        type: "manual",
+        message: "Please enter your email to receive a sign-up link.",
+      });
+      return;
+    }
+    try {
+      await sendSignInLinkToEmail(auth, email, {
+        url: "http://localhost:3000/signup", // Use localhost for now
+        handleCodeInApp: true,
+      });
+      window.localStorage.setItem("emailForSignIn", email);
+      setEmailLinkSent(true);
+    } catch (error: any) {
+      accountForm.setError("email", {
+        type: "manual",
+        message: error.message,
+      });
+    }
+  }
+
+  // Handle sign-in with email link if present in URL
+  useEffect(() => {
+    if (
+      typeof window !== "undefined" &&
+      isSignInWithEmailLink(auth, window.location.href)
+    ) {
+      let email = window.localStorage.getItem("emailForSignIn") || "";
+      if (!email) {
+        email =
+          window.prompt("Please provide your email for confirmation") || "";
+      }
+      if (email) {
+        signInWithEmailLink(auth, email, window.location.href)
+          .then((result) => {
+            window.localStorage.removeItem("emailForSignIn");
+            setFormData({ ...formData, email, firebaseUid: result.user.uid });
+            setStep(2);
+            window.scrollTo(0, 0);
+          })
+          .catch((error) => {
+            accountForm.setError("email", {
+              type: "manual",
+              message: error.message,
+            });
+          });
+      }
+    }
+    // eslint-disable-next-line
+  }, [formData, accountForm, auth]);
+
   function onSubmitProfileForm(values: z.infer<typeof profileFormSchema>) {
     setFormData({ ...formData, ...values });
     setStep(3);
@@ -264,6 +323,17 @@ export default function SignupPage() {
                     >
                       <Mail className="mr-2 h-4 w-4" />
                       Sign up with Google
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={handleEmailLinkSignup}
+                      disabled={emailLinkSent}
+                    >
+                      <Mail className="mr-2 h-4 w-4" />
+                      {emailLinkSent
+                        ? "Email Link Sent"
+                        : "Sign up with Email Link"}
                     </Button>
                   </div>
 
@@ -519,9 +589,9 @@ export default function SignupPage() {
                             </FormControl>
                             <SelectContent>
                               <SelectItem value="us">United States</SelectItem>
+                              <SelectItem value="in">India</SelectItem>
                               <SelectItem value="ca">Canada</SelectItem>
                               <SelectItem value="uk">United Kingdom</SelectItem>
-                              <SelectItem value="in">India</SelectItem>
                               <SelectItem value="au">Australia</SelectItem>
                               <SelectItem value="de">Germany</SelectItem>
                               <SelectItem value="fr">France</SelectItem>
@@ -572,10 +642,10 @@ export default function SignupPage() {
                             </FormDescription>
                           </div>
                           {[
-                            "gala",
-                            "virtual",
-                            "physical",
-                            "marathon"
+                            "Gala",
+                            "Conference",
+                            "Virtual",
+                            "Marathon",
                           ].map((item) => (
                             <FormField
                               key={item}
