@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { ChevronLeft, CreditCard, Check } from "lucide-react"
 import { useRouter } from 'next/navigation';
-
+// import { v4 as uuidv4 } from "uuid";
 
 export default function RegisterPage({ params }: { params: { id: string } }) {
   const [step, setStep] = useState(1)
@@ -40,47 +40,61 @@ export default function RegisterPage({ params }: { params: { id: string } }) {
     if (!attendee.email || !attendee.firstName || !attendee.lastName) {
       alert("Please fill in all required fields.");
       return;
-    } 
+    }
+  
+    // Dummy/fallback values in place of Firebase and UUID
+    const userId = "dummy-user-id";   // Replace with actual user logic later
+    const ticketId = "dummy-ticket-id"; // Replace with actual ticket logic later
   
     const registrationData = {
-      eventId: params.id,
-      userId: "current-user-id", // You'll need to get this from your auth system
-      ticketId: "generated-ticket-id", // Generate or get this from your ticket system
+      eventId: params?.id,
+      userId,
+      ticketId,
       customFields: {
         firstName: attendee.firstName,
         lastName: attendee.lastName,
         email: attendee.email,
-        phone: attendee.phone,
-        company: attendee.company,
-        referral: attendee.referral
+        phone: attendee.phone || "",
+        company: attendee.company || "",
+        referral: attendee.referral || "",
       },
-      // qrCode: generateQRCode(), // Implement this function
       isCheckedIn: false,
-      checkedInAt: null // Will be set when checked in
+      checkedInAt: null,
     };
   
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/registrations/`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(registrationData),
-      });
+      // const apiUrl = `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/registrations`;
   
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Registration failed.");
-      }
+      // if (!process.env.NEXT_PUBLIC_API_BASE_URL) {
+      //   throw new Error("API base URL is not defined in env");
+      // }
   
-      const result = await response.json();
+      // const response = await fetch(apiUrl, {
+      //   method: "POST",
+      //   headers: {
+      //     "Content-Type": "application/json",
+      //   },
+      //   credentials: "include", // optional depending on auth setup
+      //   body: JSON.stringify(registrationData),
+      // });
+  
+      // const result = await response.json();
+  
+      // if (!response.ok || result.status !== true) {
+      //   const errorMessage = result?.message || "Registration failed.";
+      //   throw new Error(errorMessage);
+      // }
+  
+      // console.log("Registration Success:", result);
   
       router.push(
         `/qrcode?email=${attendee.email}&firstName=${attendee.firstName}&lastName=${attendee.lastName}`
       );
     } catch (error) {
       console.error("Error during registration:", error);
-      alert("There was an issue completing your registration. Please try again.");
+      alert(
+        "There was an issue completing your registration. Please try again."
+      );
     }
   };
   
